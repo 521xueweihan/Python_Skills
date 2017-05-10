@@ -1,7 +1,7 @@
 # Python Tools
 
 ## 介绍
-
+下面列举了我在 Python 用到的工具，用以提高编码效率。
 
 1. pip：python包管理。安装：`sudo easy_install pip`
 
