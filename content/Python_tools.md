@@ -1,12 +1,11 @@
 # Python Tools
 
 ## 介绍
-下面列举了我在 Python 用到的工具，用以提高编码效率。
+下面列举了我在 Python 开发过程中用到的工具。
 
-1. pip：python包管理。安装：`sudo easy_install pip`
+1. pip：python 包管理，[入门教程](http://www.cnblogs.com/xueweihan/p/4981704.html)
 
-2. virtualenvwrapper：python虚拟环境管理。如果pip安装过程中遇到six安装问题，则可尝试使用brew安装python，或者
-`pip install --ignore-installed six`
+2. virtualenvwrapper：python虚拟环境管理，[入门教程](http://www.cnblogs.com/xueweihan/p/5531197.html)
 
 3. ipython：交互式python解释器，带有自动补全等高级功能。安装：`sudo pip install ipython`
 
