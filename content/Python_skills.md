@@ -349,19 +349,59 @@ c = C()
 参考：
 - [你不知道的 super](http://funhacks.net/explore-python/Class/super.html)
 
-## 二、并发
+## 二、性能
+关于性能问题，可以归结于两种类型：计算密集型、I/O密集型。
+
+- 计算密集型是计算量大，所以需要**并行**计算。
+- I/O 密集型问题在于数据读取的等待时间，所以同时发起 I/O 就很重要（后面就是谁先处理完I/O就搞它），所以**并发**才是解决的关键。
+
+这就很通畅了，针对性能问题的不同场景，就要对症下药。什么多线程、多进程、协程、事件循环等技术都是为了解决上述两类问题的方案，所以先清楚性能的“痛处”是哪里，后面再介绍每种技术（解决方案、解药）的时候，才能有更深的体会。
+
 ### 1. GIL
-GIL 的全程为 Global Interpreter Lock ，意即全局解释器锁。在 Python 语言的主流解释器 CPython 中，GIL 是一个货真价实的全局线程锁，在解释器解释执行任何 Python 代码时，都需要先获得这把锁才行，在遇到 I/O 操作时会释放这把锁。如果是纯计算的程序，没有 I/O 操作，解释器会每隔特定次操作就释放这把锁，让别的线程有机会执行（这个次数可以通过 sys.setcheckinterval 来调整）。所以虽然 CPython 的线程库直接封装操作系统的原生线程，但 CPython 进程做为一个整体，同一时间只会有一个获得了 GIL 的线程在跑，其它的线程都处于等待状态等着 GIL 的释放。
+再聊到 Python 性能问题时，必然提到 GIL 全局解释器锁，一个货真价实的**全局线程锁**，它存在于主流解释器 CPython 中（有的解释器就没有GIL）。
 
-GIL 最大的问题就是 Python 的多线程程序并不能利用多核 CPU 的优势。
+#### 1.1 GIL 的作用
+解释型语言比如 Python 是需要先通过解释器，把 Python 代码解释成字节码（bytecode）。而 GIL 的作用就是保证字节码层是线程安全的，这里需要弄明白的是字节码和 Python 代码的层级不同。GIL 保证字节码的线程安全，并不能保证 Python 代码的线程安全。因为一行 Python 代码，对应的字节码并不是一行：
+```Python
+>>> def f():
+...   global num
+...   num += 1
+...
+>>> dis.dis(f)
+  3           0 LOAD_GLOBAL              0 (num)
+              3 LOAD_CONST               1 (1)
+              6 INPLACE_ADD
+              7 STORE_GLOBAL             0 (num)
+             10 LOAD_CONST               0 (None)
+             13 RETURN_VALUE
+```
+这个例子中，实现`num + = 1`需要 4个字节码，又因为线程可能在 `LOAD_GLOBAL` 和 `STORE_GLOBAL` 之间切换，所以导致多线程执行 `f()` 时会出现脏数据。
 
-Python 只能跑在一个核上，这也就为什么，Python 只能跑满一个 CPU，而且多线程由于分时切换，还跑不满一个 CPU。
-
-所以，“不要使用多线程，使用多进程”，推荐使用多进程（multiprocessing 模块）或用 C 扩展解决计算密集型任务。
+**GIL 的作用小结：**
+- GIL 保证同一时间只有一个线程在执行字节码
 
 参考：
+- [Why does Python provide locking mechanisms if it's subject to a GIL?](https://stackoverflow.com/questions/26873512/why-does-python-provide-locking-mechanisms-if-its-subject-to-a-gil)
+
+#### 1.2 GIL 对线程切换的影响
+Python 的线程虽然是系统级别原生线程，但是由于有 GIL 的存在，每次线程切换之前都需要先获取 GIL，之后才能进行线程调度。使得线程切换**代价更高**和**复杂**。
+
+- 遇到 I/O 情况，将释放GIL。
+- 非 I/O 情况下线程在执行特定步数（ticks）后释放GIL。
+
+所以：
+1. 计算密集型场景：**单核单线程** > **单核多线程** > **多核多线程** （多核：CPU2 上的线程被唤醒时，CPU1 上的线程又把 GIL 锁上了，所以中间造成了很多浪费）
+2. I/O密集型场景：多线程 > 单线程
+3. Python 多线程无法实现并行
+
+参考：
+- [Understanding the Python GIL](http://www.dabeaz.com/GIL/)
 - [python 线程，GIL 和 ctypes](http://zhuoqiang.me/python-thread-gil-and-ctypes.html)
-- [Python 的全局锁问题](http://python3-cookbook.readthedocs.io/zh_CN/latest/c12/p09_dealing_with_gil_stop_worring_about_it.html)
+
+#### 1.3 总结
+1. 计算密集型采用**多进程**（multiprocessing）、C 扩展
+2. I/O密集型采用**多线程**（threading）、事件循环
+
 
 ### 2. PyPy
 PyPy 是 Python 的一种解释器，用 Python 的子集 rPython 实现的。
@@ -372,11 +412,9 @@ PyPy 的执行效率高于 CPython 是因为 JIT，也就是解释完 Python 代
 - [PyPy 为什么会比 CPython 还要快？](https://www.zhihu.com/question/19588346)
 
 ### 3. 多进程
+multiprocessing 库
 
 ### 4. 多线程
-
-
-
 多线程的使用存在**线程安全问题**，即：有可能出现多个线程同时更改数据造成所得到的数据是脏数据（错误的数据）。所以，在多线程执行写入的操作时，要考虑线程同步问题。也就是需要加锁，以保证同一时间只有一个线程写入数据。（注意：加锁操作完后，要释放）
 
 ### 5. 协程
