@@ -6,6 +6,19 @@ Python 自带了很多好用的工具和有意思的小技巧，这些‘小’�
 # 小技巧
 Python 代码中的便利的代码片段。
 
+## Mac 下发送通知
+```python
+import os
+
+def notify(title, text):
+	# 调用 mac osascript 命令
+    os.system("""
+              osascript -e 'display notification "{}" with title "{}"'
+              """.format(text, title))
+
+notify("通知", "三年二班xxx，到教导处来一趟。")
+```
+
 ## print 输出到文件中
 ```
 print >>  file("myfile", "w"), "hello world"
