@@ -384,23 +384,23 @@ c = C()
 - [Why does Python provide locking mechanisms if it's subject to a GIL?](https://stackoverflow.com/questions/26873512/why-does-python-provide-locking-mechanisms-if-its-subject-to-a-gil)
 
 #### 1.2 GIL 对线程切换的影响
-Python 的线程虽然是系统级别原生线程，但是由于有 GIL 的存在，每次线程切换之前都需要先获取 GIL，之后才能进行线程调度。使得线程切换**代价更高**和**复杂**。
+Python 的线程虽然是系统级别原生线程，但是由于有 GIL 的存在，每次线程切换之前都需要先获取 GIL，之后才能进行线程调度。遇到 I/O 情况，将释放GIL。非 I/O 情况下线程在执行特定步数（ticks）后释放GIL。
 
-- 遇到 I/O 情况，将释放GIL。
-- 非 I/O 情况下线程在执行特定步数（ticks）后释放GIL。
+- 使得线程切换**代价更高**。
+- 无法实现真正的线程并行
 
 所以：
-1. 计算密集型场景：**单核单线程** > **单核多线程** > **多核多线程** （多核：CPU2 上的线程被唤醒时，CPU1 上的线程又把 GIL 锁上了，所以中间造成了很多浪费）
+1. 计算密集型场景：**单核单线程** > **单核多线程** > **多核多线程**（多核线程切换：CPU2 上的线程被唤醒时，CPU1 上的线程又把 GIL 锁上了，所以中间造成了很多浪费。同时，更多的线程检查GIL情况也造成了资源浪费。）
 2. I/O密集型场景：多线程 > 单线程
-3. Python 多线程无法实现并行
+
 
 参考：
 - [Understanding the Python GIL](http://www.dabeaz.com/GIL/)
 - [python 线程，GIL 和 ctypes](http://zhuoqiang.me/python-thread-gil-and-ctypes.html)
 
 #### 1.3 总结
-1. 计算密集型采用**多进程**（multiprocessing）、C 扩展
-2. I/O密集型采用**多线程**（threading）、事件循环
+1. 计算密集型采用**多进程**（multiprocessing库）、C 扩展
+2. I/O密集型采用**多线程**（threading库）、事件循环
 
 
 ### 2. PyPy
@@ -415,6 +415,8 @@ PyPy 的执行效率高于 CPython 是因为 JIT，也就是解释完 Python 代
 multiprocessing 库
 
 ### 4. 多线程
+threading 库
+
 多线程的使用存在**线程安全问题**，即：有可能出现多个线程同时更改数据造成所得到的数据是脏数据（错误的数据）。所以，在多线程执行写入的操作时，要考虑线程同步问题。也就是需要加锁，以保证同一时间只有一个线程写入数据。（注意：加锁操作完后，要释放）
 
 ### 5. 协程
