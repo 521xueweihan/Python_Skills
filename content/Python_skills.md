@@ -16,7 +16,7 @@ Python 包含了很多语法特性，理解了这些编码的技巧，可以让 
         * [4.2 迭代器（Iterator）](#42-迭代器iterator)
         * [4.3 生成器（Generator）](#43-生成器generator)
     * [5. super](#5super)
-* [二、并发](#二并发)
+* [二、性能](#二性能)
     * [1. GIL](#1-gil)
     * [2. PyPy](#2-pypy)
 
@@ -353,7 +353,7 @@ c = C()
 关于性能问题，可以归结于两种类型：计算密集型、I/O密集型。
 
 - 计算密集型是计算量大，所以需要**并行**计算。
-- I/O 密集型问题在于数据读取的等待时间，所以同时发起 I/O 就很重要（后面就是谁先处理完I/O就搞它），所以**并发**才是解决的关键。
+- I/O 密集型问题在于数据读取的等待时间，同时发起 I/O 就很重要（后面就是谁先处理完I/O就搞它），所以**并发**才是解决的关键。
 
 这就很通畅了，针对性能问题的不同场景，就要对症下药。什么多线程、多进程、协程、事件循环等技术都是为了解决上述两类问题的方案，所以先清楚性能的“痛处”是哪里，后面再介绍每种技术（解决方案、解药）的时候，才能有更深的体会。
 
@@ -412,12 +412,67 @@ PyPy 的执行效率高于 CPython 是因为 JIT，也就是解释完 Python 代
 - [PyPy 为什么会比 CPython 还要快？](https://www.zhihu.com/question/19588346)
 
 ### 3. 多进程
-multiprocessing 库
+multiprocessing 库，根据 CPU 数量（cpu_count）创建进程池，每个核上一个进程减少切换进程的损耗，性能最高。
+
+```python
+from multiprocessing import Pool
+import time
+
+def f(x):
+    return x*x
+
+if __name__ == '__main__':
+    pool = Pool(processes=4)              # start 4 worker processes
+
+    result = pool.apply_async(f, (10,))   # evaluate "f(10)" asynchronously in a single process
+    print result.get(timeout=1)           # get 是阻塞操作 prints "100" unless your computer is *very* slow
+
+    print pool.map(f, range(10))          # prints "[0, 1, 4,..., 81]"
+
+    it = pool.imap(f, range(10))
+    print it.next()                       # prints "0"
+    print it.next()                       # prints "1"
+    print it.next(timeout=1)              # prints "4" unless your computer is *very* slow
+
+    result = pool.apply_async(time.sleep, (10,))
+    print result.get(timeout=1)           # raises multiprocessing.TimeoutError
+```
+
+参考：
+- [multiprocessing](https://docs.python.org/2/library/multiprocessing.html)
 
 ### 4. 多线程
 threading 库
 
-多线程的使用存在**线程安全问题**，即：有可能出现多个线程同时更改数据造成所得到的数据是脏数据（错误的数据）。所以，在多线程执行写入的操作时，要考虑线程同步问题。也就是需要加锁，以保证同一时间只有一个线程写入数据。（注意：加锁操作完后，要释放）
+多线程的使用存在**线程安全问题**，即：有可能出现多个线程同时更改数据造成所得到的数据是脏数据（错误的数据）。所以，在多线程执行写入的操作时，要考虑线程同步问题。也就是需要加锁或使用队列，以保证同一时间只有一个线程写入数据。（注意：加锁操作完后，要释放）
+
+```python
+>>> from threading import Thread
+>>> class Worker(Thread):
+...   def __init__(self, id):
+...     super(Worker, self).__init__()
+...     self._id = id
+...   def run(self):
+...     print "I am worker %d" % self._id
+...
+>>> t1 = Worker(1)
+>>> t2 = Worker(2)
+>>> t1.start(); t2.start()
+I am worker 1
+I am worker 2
+
+# using function could be more flexible
+>>> def Worker(worker_id):
+...   print "I am worker %d" % worker_id
+...
+>>> from threading import Thread
+>>> t1 = Thread(target=Worker, args=(1,))
+>>> t2 = Thread(target=Worker, args=(2,))
+>>> t1.start()
+I am worker 1
+I am worker 2
+```
+
 
 ### 5. 协程
 1. 协程是比线程**更轻量**（资源使用更少）。
