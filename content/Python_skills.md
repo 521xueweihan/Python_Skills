@@ -10,6 +10,7 @@ Python 包含了很多语法特性，理解了这些编码的技巧，可以让 
         * [1.2 `__getattribute__`](#12-`__getattribute__`)
         * [1.3 其它魔法方法](#13-其它魔法方法)
     * [2. 装饰器](#2-装饰器)
+        * [2.1 装饰器执行顺序](#21-装饰器执行顺序)
     * [3. 上下文管理](#3-上下文管理)
     * [4. 可迭代对象、迭代器、生成器](#4-可迭代对象迭代器生成器)
         * [4.1 可迭代对象（Iterable）](#41-可迭代对象iterable)
@@ -37,8 +38,9 @@ Python 的类是个很好玩的东西，它约定了很多‘特殊的方法’�
 
 ```python
 class Singleton(object):
+    _instance = None
     def __new__(cls, *args, **kw):
-        if not hasattr(cls,'_instance')
+        if not cls._instance:
             cls._instance = super(Singleton, cls).__new__(cls, *args, **kw)  
         return cls._instance  # 必须要返回类的实例
 ```
@@ -161,6 +163,41 @@ print value4.__name__
 
 参考：
 - [Python 修饰器的函数式编程](http://coolshell.cn/articles/11265.html)
+
+#### 2.1 装饰器执行顺序
+装饰器等同于：`f = decorator_b(decorator_a(f))`，装饰顺序按靠近函数顺序执行，调用时由外而内，执行顺序和装饰顺序相反。
+
+```python
+def decorator_a(func):
+    print 'Get in decorator_a'
+    def inner_a(*args, **kwargs):
+        print 'Get in inner_a'
+        return func(*args, **kwargs)
+    return inner_a
+
+def decorator_b(func):
+    print 'Get in decorator_b'
+    def inner_b(*args, **kwargs):
+        print 'Get in inner_b'
+        return func(*args, **kwargs)
+    return inner_b
+
+@decorator_b
+@decorator_a
+def f(x):
+    print 'Get in f'
+    return x * 2
+
+f(1)
+
+Get in decorator_a
+Get in decorator_b
+Get in inner_b
+Get in inner_a
+Get in f
+```
+参考：
+- [Python 装饰器执行顺序迷思](https://segmentfault.com/a/1190000007837364)
 
 ### 3. 上下文管理
 上下文管理是用于便于精确地分配和释放资源。例如：文件IO、数据库连接等。这些操作在使用完，都需要释放资源。
